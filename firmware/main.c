@@ -49,7 +49,11 @@ int main(void)
 	if(!(IO_IN & MODE_RESET))
 	{
 	    // Reset pin is selected (active low)
-	    return 0;
+
+	    // For now... turn LED on.
+	    IO_OUT |= BTN_LED;
+
+	    while 1;
 	}
 
 	if(!(IO_IN & MODE_PROG))
