@@ -1,4 +1,5 @@
 #include <msp430.h> 
+#include <primething.h>
 
 /*
  * Pin Assignments:
@@ -24,27 +25,14 @@
  * 20 - DVSS
  */
 
-
-#define IO_DIR      P2DIR
-#define IO_OUT      P2OUT
-#define IO_IN       P2IN
-#define IO_IE       P2IE
-#define IO_IES      P2IES
-#define IO_IFG      P2IFG
-#define BUTTON      BIT2
-#define MODE_RESET  BIT0
-#define MODE_PROG   BIT1
-#define BTN_LED     BIT3
-#define LCD_CS      BIT4
-#define FLASH_CS    BIT5
-#define LCD_MODE    BIT7
-
 void initDevice(void);
+void initLcd(void);
 
 int main(void)
 {
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
 	initDevice();
+	initLcd();
 	
 	if(!(IO_IN & MODE_RESET))
 	{
@@ -53,12 +41,17 @@ int main(void)
 	    // For now... turn LED on.
 	    IO_OUT |= BTN_LED;
 
-	    while 1;
+	    return 0;
 	}
 
 	if(!(IO_IN & MODE_PROG))
 	{
 	    // Program pin is selected (active low)
+
+	    displayString("ProgMode");
+	    initUart();
+	    progFlash();
+
 	    return 0;
 	}
 
@@ -88,12 +81,68 @@ void initDevice(void)
     P1OUT = 0;
 
     // Port 2 is our general IO port.
+    P2OUT = FLASH_CS | LCD_CS;  // start with SPI Chip Selects high
     P2DIR = LCD_MODE | FLASH_CS | LCD_CS | BTN_LED;
     P2REN = BIT6 | BUTTON | MODE_PROG | MODE_RESET;
-    P2OUT = FLASH_CS | LCD_CS;  // start with SPI Chip Selects high
 
     // Initialize SPI interface on USCI_B0
-    UCB0CTL0 = UCMST | UCSYNC;
+    UCB0CTL0 = UCCKPH | UCCKPL | UCMSB | UCMST | UCSYNC;
+    UCB0BR0 = 0;
+    UCB0BR1 = 0;
     UCB0CTL1 = UCSSEL_2;
+}
 
+void initLcd(void)
+{
+    __delay_cycles(40000);          // 40ms startup delay for LCD module
+
+    IO_OUT &= (~LCD_MODE);          // LCD command mode
+    IO_OUT &= (~LCD_CS);            // LCD chip select active
+
+    UCB0TXBUF = 0x31;               // Function set
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us
+
+    UCB0TXBUF = 0x14;               // Bias set
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us
+
+    UCB0TXBUF = 0x55;               // Power control
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us delay
+
+    UCB0TXBUF = 0x6D;               // Follower control
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us delay
+
+    UCB0TXBUF = 0x7C;               // Contrast set
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us delay
+
+    UCB0TXBUF = 0x30;               // Function set
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us delay
+
+    UCB0TXBUF = 0x0C;               // Display on
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us delay
+
+    UCB0TXBUF = 0x01;               // Clear display
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(1080);           // 1.08ms delay
+
+    UCB0TXBUF = 0x06;               // Entry mode set
+    while(!(IFG2 & UCB0TXIFG));
+    while(!(UCB0STAT & UCBUSY));
+    __delay_cycles(27);             // 27us delay
+
+    IO_OUT |= LCD_CS;               // LCD chip select inactive
 }
