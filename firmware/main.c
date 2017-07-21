@@ -51,6 +51,7 @@ int main(void)
 	    displayString("ProgMode");
 	    initUart();
 	    progFlash();
+	    displayString("Done");
 
 	    return 0;
 	}
